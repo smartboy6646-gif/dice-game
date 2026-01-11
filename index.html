@@ -1,62 +1,216 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ne">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Call Break</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Shut the Box - Smart Online</title>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database-compat.js"></script>
+    <style>
+        :root { --p1: #ff4757; --p2: #f1c40f; --bg: #121212; }
+        body { font-family: 'Segoe UI', sans-serif; background: var(--bg); color: white; text-align: center; margin: 0; touch-action: manipulation; }
+        
+        #login-screen { position: fixed; inset: 0; background: var(--bg); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        input { padding: 15px; margin: 10px; width: 80%; max-width: 300px; border-radius: 10px; border: none; font-size: 16px; }
+
+        .board { display: flex; flex-direction: column; justify-content: space-between; height: 100vh; padding: 10px; box-sizing: border-box; }
+        .card-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; max-width: 400px; margin: 0 auto; }
+        
+        .card { 
+            height: 80px; background: #fff; color: #000; border-radius: 12px; 
+            display: flex; align-items: center; justify-content: center; 
+            font-weight: bold; font-size: 24px; box-shadow: 0 5px #bbb; transition: 0.2s;
+        }
+        .p1 .card { background: var(--p1); color: white; }
+        .p2 .card { background: var(--p2); color: #000; }
+        
+        .selected { transform: translateY(-8px); border: 4px solid #00ff00; box-shadow: 0 0 20px #00ff00; }
+        .shut { opacity: 0.05; transform: scale(0.8); pointer-events: none; }
+
+        .dice { display: inline-block; width: 70px; height: 70px; background: white; color: black; border-radius: 15px; font-size: 50px; line-height: 70px; margin: 10px; box-shadow: 0 6px #ddd; }
+        .rolling { animation: shake 0.1s infinite; }
+        @keyframes shake { 0% { transform: rotate(5deg); } 50% { transform: rotate(-5deg); } 100% { transform: rotate(5deg); } }
+
+        .info-panel { background: rgba(255,255,255,0.1); padding: 10px; border-radius: 15px; margin: 10px 0; }
+        #roll-btn { background: #3498db; color: white; padding: 20px 40px; border-radius: 40px; border: none; font-size: 20px; font-weight: bold; box-shadow: 0 6px #2980b9; }
+        #roll-btn:disabled { opacity: 0.3; box-shadow: none; transform: translateY(4px); }
+    </style>
 </head>
 <body>
-    <div id="loginScreen">
-        <h1>Call Break</h1>
-        <input type="text" id="playerName" placeholder="Enter your name">
-        <button id="playButton">Play</button>
+
+<div id="login-screen">
+    <h2>🎲 Shut the Box Online</h2>
+    <input type="text" id="user-name" placeholder="Tapai ko Name">
+    <input type="text" id="room-id" placeholder="Room ID">
+    <button onclick="joinGame()" style="padding:15px 40px; background:#2ecc71; border:none; border-radius:10px; color:white; font-weight:bold;">KHELNA SURU GARNE</button>
+</div>
+
+<div class="board">
+    <div id="p2-area" class="card-row p2"></div>
+
+    <div class="info-panel">
+        <div id="status">Waiting for players...</div>
+        <div id="dice-container">
+            <div id="d1" class="dice">⚀</div>
+            <div id="d2" class="dice">⚀</div>
+        </div>
+        <p>Target: <span id="target">0</span> | Selected: <span id="sum">0</span></p>
+        <button id="roll-btn" onclick="roll()">ROLL DICE</button>
     </div>
 
-    <div id="gameScreen" class="hidden">
-        <div id="table">
-            <div class="player top" data-pos="2">
-                <div class="info"><div class="name"></div><div class="bid">Bid: -</div><div class="tricks">Tricks: 0</div></div>
-                <div class="hand"></div>
-            </div>
-            <div class="player left" data-pos="3">
-                <div class="info"><div class="name"></div><div class="bid">Bid: -</div><div class="tricks">Tricks: 0</div></div>
-                <div class="hand"></div>
-            </div>
-            <div class="player right" data-pos="1">
-                <div class="info"><div class="name"></div><div class="bid">Bid: -</div><div class="tricks">Tricks: 0</div></div>
-                <div class="hand"></div>
-            </div>
-            <div class="player bottom" data-pos="0">
-                <div class="info"><div class="name"></div><div class="bid">Bid: -</div><div class="tricks">Tricks: 0</div><div class="score">Score: 0</div></div>
-                <div class="hand" id="myHand"></div>
-            </div>
+    <div id="p1-area" class="card-row p1"></div>
+</div>
 
-            <div id="centerTrick">
-                <div class="played-card top"></div>
-                <div class="played-card left"></div>
-                <div class="played-card right"></div>
-                <div class="played-card bottom"></div>
-            </div>
+<audio id="dice-sound" src="https://www.soundjay.com/board-games/sounds/dice-roll-1.mp3"></audio>
 
-            <div id="message"></div>
-        </div>
+<script>
+    // Firebase Config (Replace with yours)
+    const firebaseConfig = { apiKey: "AIzaSyDKKAxKTFJcMDmj6j21nKHwlSpwAxsw57k",
+  authDomain: "call-breke.firebaseapp.com",
+  databaseURL: "https://call-breke-default-rtdb.firebaseio.com",
+  projectId: "call-breke",
+  storageBucket: "call-breke.firebasestorage.app",
+  messagingSenderId: "908751603046",
+  appId: "1:908751603046:web:fd30e07b9e6400b35c74a7",
+  measurementId: "G-V2D55S47QV" };
+    firebase.initializeApp(firebaseConfig);
+    let db, myRole, myName, roomID;
 
-        <div id="biddingModal" class="modal hidden">
-            <div class="modal-content">
-                <h2>Your bid (1-13)</h2>
-                <input type="number" id="bidInput" min="1" max="13" value="3">
-                <button id="submitBid">Submit</button>
-            </div>
-        </div>
+    function joinGame() {
+        myName = document.getElementById('user-name').value;
+        roomID = document.getElementById('room-id').value;
+        if(!myName || !roomID) return alert("Sabai detail halnuhos!");
+        
+        db = firebase.database().ref('rooms/' + roomID);
+        document.getElementById('login-screen').style.display = 'none';
+        
+        db.child('players_count').transaction(c => (c || 0) + 1, (err, committed, snap) => {
+            myRole = snap.val();
+            initGame();
+        });
+    }
 
-        <audio id="cardSound" src="sounds/card.mp3"></audio>
-    </div>
+    function initGame() {
+        const p1Row = document.getElementById('p1-area');
+        const p2Row = document.getElementById('p2-area');
+        for(let i=1; i<=12; i++) {
+            p1Row.innerHTML += `<div class="card" id="p1-c-${i}" onclick="selectCard(1, ${i})">${i}</div>`;
+            p2Row.innerHTML += `<div class="card" id="p2-c-${i}" onclick="selectCard(2, ${i})">${i}</div>`;
+        }
+        
+        db.on('value', snap => {
+            const data = snap.val() || {};
+            if(!data.turn) return db.update({ turn: 1, target: 0, p1_shut: "", p2_shut: "" });
+            render(data);
+        });
+    }
 
-    <script src="firebase.js"></script>
-    <script src="game.js"></script>
+    function render(data) {
+        const isMyTurn = data.turn === myRole;
+        document.getElementById('status').innerText = isMyTurn ? "Tapai ko palo!" : "Arko player ko palo...";
+        document.getElementById('roll-btn').disabled = !isMyTurn || data.target > 0;
+        document.getElementById('target').innerText = data.target;
+
+        const emojis = ['⚀','⚁','⚂','⚃','⚄','⚅'];
+        document.getElementById('d1').innerText = emojis[(data.d1 || 1)-1];
+        document.getElementById('d2').innerText = emojis[(data.d2 || 1)-1];
+
+        [1,2].forEach(p => {
+            const shutArr = (data[`p${p}_shut`] || "").split(',').filter(x => x);
+            for(let i=1; i<=12; i++) {
+                const el = document.getElementById(`p${p}-c-${i}`);
+                el.classList.remove('shut', 'selected');
+                if(shutArr.includes(i.toString())) el.classList.add('shut');
+            }
+        });
+
+        // Smart Pass Check: Yadi move sambhab chhaina bhane auto-pass
+        if(isMyTurn && data.target > 0) {
+            checkPossibleMoves(data);
+        }
+    }
+
+    function roll() {
+        document.getElementById('dice-sound').play();
+        document.getElementById('d1').classList.add('rolling');
+        document.getElementById('d2').classList.add('rolling');
+
+        setTimeout(() => {
+            const v1 = Math.floor(Math.random() * 6) + 1;
+            const v2 = Math.floor(Math.random() * 6) + 1;
+            db.update({ d1: v1, d2: v2, target: v1 + v2 });
+            document.getElementById('d1').classList.remove('rolling');
+            document.getElementById('d2').classList.remove('rolling');
+        }, 800);
+    }
+
+    function selectCard(p, n) {
+        if(p !== myRole) return;
+        const card = document.getElementById(`p${p}-c-${n}`);
+        if(card.classList.contains('shut')) return;
+
+        card.classList.toggle('selected');
+        const selected = document.querySelectorAll(`.p${myRole} .selected`);
+        let currentSum = 0;
+        let nums = [];
+        selected.forEach(c => {
+            currentSum += parseInt(c.innerText);
+            nums.push(c.innerText);
+        });
+
+        document.getElementById('sum').innerText = currentSum;
+
+        // Auto-Confirm Logic
+        db.once('value', s => {
+            const target = s.val().target;
+            if(currentSum === target && target > 0) {
+                setTimeout(() => finalizeMove(nums), 300);
+            }
+        });
+    }
+
+    function finalizeMove(nums) {
+        db.once('value', s => {
+            const data = s.val();
+            const oldShut = (data[`p${myRole}_shut`] || "").split(',').filter(x => x);
+            const newShut = [...oldShut, ...nums].join(',');
+            db.update({
+                [`p${myRole}_shut`]: newShut,
+                target: 0,
+                turn: myRole === 1 ? 2 : 1
+            });
+            document.getElementById('sum').innerText = "0";
+        });
+    }
+
+    function checkPossibleMoves(data) {
+        const available = [];
+        for(let i=1; i<=12; i++) {
+            if(!document.getElementById(`p${myRole}-c-${i}`).classList.contains('shut')) {
+                available.push(i);
+            }
+        }
+
+        // Simple Subset Sum function check (can we make data.target from available cards?)
+        const canMakeSum = (arr, target) => {
+            let n = arr.length;
+            for (let i = 0; i < (1 << n); i++) {
+                let sum = 0;
+                for (let j = 0; j < n; j++) {
+                    if ((i >> j) & 1) sum += arr[j];
+                }
+                if (sum === target) return true;
+            }
+            return false;
+        };
+
+        if(!canMakeSum(available, data.target)) {
+            document.getElementById('status').innerText = "Kunaipani move milena! Auto-passing...";
+            setTimeout(() => {
+                db.update({ target: 0, turn: myRole === 1 ? 2 : 1 });
+            }, 3000);
+        }
+    }
+</script>
 </body>
 </html>
